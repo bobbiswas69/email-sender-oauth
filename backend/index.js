@@ -35,13 +35,30 @@ const emailLimiter = rateLimit({
 app.use(express.json());
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'http://localhost:3000',
+  'https://bobbiswas69.github.io',
+  'https://bobbiswas69.github.io/email-sender-oauth'
+];
+
+// Add GitHub Pages URL if it exists in environment
+if (process.env.GITHUB_PAGES_URL) {
+  allowedOrigins.push(process.env.GITHUB_PAGES_URL);
+}
+
 app.use(cors({
-  origin: [
-    'http://localhost:5500',
-    'http://127.0.0.1:5500',
-    'https://yourusername.github.io', // Replace with your GitHub Pages URL
-    'http://localhost:3000'
-  ],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 

@@ -4,7 +4,7 @@ const config = {
     googleClientId: 'your_development_client_id'
   },
   production: {
-    apiUrl: 'https://your-render-backend-url.onrender.com',
+    apiUrl: 'http://localhost:3000',
     googleClientId: 'your_production_client_id'
   }
 };
