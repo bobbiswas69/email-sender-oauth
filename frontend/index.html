@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OneClick Mailer</title>
+
+  <!-- Google Fonts (Roboto) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link 
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" 
+    rel="stylesheet"
+  >
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- FIXED NAVBAR -->
+  <nav id="navbar">
+    <div class="nav-left">
+      <a href="#" class="logo">OneClick Mailer</a>
+    </div>
+    <div class="nav-right">
+      <ul>
+        <li><a href="#" onclick="scrollToSection('hero')">Home</a></li>
+        <li><a href="#" onclick="scrollToSection('instructions')">About</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- HERO SECTION -->
+  <section id="hero">
+    <div class="hero-overlay">
+      <div class="hero-content">
+        <h1>Send Multiple Personalized<br>Emails in One Click</h1>
+        <p>
+          Tired of manually emailing potential referrers and contacts one by one? 
+          Our free, intuitive web app streamlines the process by letting you send 
+          multiple personalized emails to a bunch of users in a single click—so 
+          you can focus on landing your dream job.
+        </p>
+        <p style="margin-top:16px;">
+          <button onclick="window.scrollToSection('mainContent')" class="cta-btn">Get Started</button>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div id="mainContent">
+    <header id="authHeader">
+      <h2 id="appTitle">Free Personalized Job Application Mailer</h2>
+      <p id="authStatus">Checking login status...</p>
+      <div id="authActions"></div>
+    </header>
+
+    <!-- YOUR NAME -->
+    <section class="translucent-box" id="userInfo">
+      <h2>Your Details</h2>
+      <label>Your Name:</label>
+      <input type="text" id="userNameInput" placeholder="e.g. John Smith" />
+    </section>
+
+    <!-- JOB INFO -->
+    <section class="translucent-box" id="job-info">
+      <h2>Job Information</h2>
+      <div class="form-row">
+        <label for="role">Role:</label>
+        <input type="text" id="role" placeholder="e.g. SWE" required>
+      </div>
+      <div class="form-row">
+        <label for="company">Company:</label>
+        <input type="text" id="company" placeholder="e.g. Google" required>
+      </div>
+      <div class="form-row">
+        <label for="joblink">Job Link:</label>
+        <input type="url" id="joblink" placeholder="https://..." required>
+      </div>
+    </section>
+
+    <!-- EMAIL SUBJECT & TEMPLATE -->
+    <section class="translucent-box" id="template-section">
+      <h2>Email Subject & Template</h2>
+      <div class="form-row">
+        <label for="subjectInput">Subject:</label>
+        <input type="text" id="subjectInput" placeholder="Regarding {Role} at {Company}" required>
+      </div>
+      
+      <textarea id="emailTemplate" rows="12">
+Hello {Name},
+
+I know you're really busy and that you get a lot of emails. So this will only take sixty seconds to read.
+
+I came across the {Role} position at {Company} and feel I'd be an excellent fit. My name is {UserName} and I ...fill in on why you'd be a good fit (education, projects, key achievements)
+
+I'd be really grateful if you could guide me onto who I could reach out to for this or provide me with a referral. If you'd like, I can connect any time this week for a short call. Feel free to schedule time using my Calendly link: optional: to include your calendly link to save back and forth
+
+I totally understand if you're too busy to respond. But even a one- or two-line reply would really make my day :)
+
+(My Portfolio: put in a portfolio link if you have one)
+(Position Link: {JobLink})
+
+Best regards,
+{UserName}
+      </textarea>
+    </section>
+
+    <!-- RECIPIENTS -->
+    <section class="translucent-box">
+      <h2>Recipients</h2>
+      <div id="recipient-list">
+        <div class="recipient-block">
+          <input type="text" name="name" placeholder="Recipient Name" required>
+          <input type="email" name="email" placeholder="Recipient Email" required>
+        </div>
+      </div>
+      <button id="addRecipientBtn">+ Add Another Recipient</button>
+    </section>
+
+    <!-- RESUME UPLOAD -->
+    <section class="translucent-box" id="resume-section">
+      <h2>Upload a Resume (PDF)</h2>
+      <p>Optional: attach a single PDF to all emails in this batch.</p>
+      <input type="file" id="resumeFileInput" accept="application/pdf">
+      <p class="note" id="uploadedResumeName"></p>
+    </section>
+
+    <!-- SEND BUTTON -->
+    <section id="send-section">
+      <button id="sendBtn">Send Emails</button>
+      <div id="status"></div>
+    </section>
+
+    <!-- INSTRUCTIONS -->
+    <section class="translucent-box" id="instructions">
+      <h2>Quick Overview</h2>
+      <ul>
+        <li><strong>Sign in</strong> (with the "G" button) so we can send from your Gmail.</li>
+        <li>Fill out <strong>Your Name</strong>, <strong>Role</strong>, <strong>Company</strong>, etc.</li>
+        <li>Add multiple recipients if needed. You can remove any extra by clicking "x."</li>
+        <li>Optionally upload a PDF resume (only one). Re-upload to overwrite.</li>
+        <li>Hit "Send Emails" to deliver personalized messages. 
+            Each recipient sees a personal email from your Gmail.
+        </li>
+        <li>All free, no registration beyond Gmail sign-in.</li>
+      </ul>
+    </section>
+  </div> <!-- mainContent -->
+
+  <!-- FOOTER -->
+  <footer id="mainFooter">
+    <p>
+      &copy; 2024 - OneClick Mailer by Rayid Ali.
+      | <a href="privacy.html" target="_blank">Privacy Policy</a>
+      | <a href="terms.html" target="_blank">Terms of Service</a>
+    </p>
+  </footer>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
