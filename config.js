@@ -31,7 +31,8 @@ const api = {
         },
         mode: 'cors',
         cache: 'no-cache',
-        redirect: 'follow'
+        redirect: 'follow',
+        referrerPolicy: 'strict-origin-when-cross-origin'
       });
       
       if (!response.ok) {

@@ -110,12 +110,14 @@ app.use((req, res, next) => {
 // PASSPORT CONFIG
 passport.serializeUser((user, done) => {
   console.log('Serializing user:', user);
+  // Store the entire user object
   done(null, user);
 });
 
-passport.deserializeUser((obj, done) => {
-  console.log('Deserializing user:', obj);
-  done(null, obj);
+passport.deserializeUser((user, done) => {
+  console.log('Deserializing user:', user);
+  // Return the entire user object
+  done(null, user);
 });
 
 // Google OAuth
@@ -144,6 +146,9 @@ passport.use(
         accessToken,
         refreshToken
       };
+      
+      // Log the user object before passing to done
+      console.log('Created user object:', user);
       done(null, user);
     }
   )
@@ -166,6 +171,7 @@ app.get(
   },
   (req, res) => {
     console.log('OAuth successful, redirecting to frontend');
+    console.log('User after authentication:', req.user);
     // On success, redirect to your frontend
     const frontendUrl = process.env.NODE_ENV === 'production'
       ? 'https://bobbiswas69.github.io/email-sender-oauth'
