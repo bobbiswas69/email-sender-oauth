@@ -20,8 +20,7 @@ const app = express();
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
-  crossOriginEmbedderPolicy: false,
-  crossOriginOpenerPolicy: { policy: "unsafe-none" }
+  crossOriginEmbedderPolicy: false
 })); // Adds various HTTP headers for security
 app.use(xssClean()); // Prevent XSS attacks
 app.use(hpp()); // Prevent HTTP Parameter Pollution mee mee pooo pooo
