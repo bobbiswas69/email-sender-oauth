@@ -5,7 +5,7 @@ const config = {
   },
   production: {
     apiUrl: 'http://localhost:3000', // We'll update this after backend deployment
-    googleClientId: 'your_production_client_id' // We'll get this from Google Cloud Console
+    googleClientId: 'your_production_client_id' // We'll get this from Google Cloud Console one more change
   }
 };
 
