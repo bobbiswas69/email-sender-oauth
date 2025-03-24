@@ -192,7 +192,10 @@ window.scrollToSection = function(sectionId) {
 
 async function checkAuthStatus() {
   try {
+    console.log('Checking auth status...');
     const data = await api.fetch('/api/current-user');
+    console.log('Auth status response:', data);
+    
     const authStatus = document.getElementById('authStatus');
     const authActions = document.getElementById('authActions');
 
@@ -225,7 +228,10 @@ async function checkAuthStatus() {
 
 // Make signIn and logout globally available
 window.signIn = function() {
-  window.location.href = `${config.apiUrl}/auth/google`;
+  console.log('Starting sign in process...');
+  const authUrl = `${config.apiUrl}/auth/google`;
+  console.log('Redirecting to:', authUrl);
+  window.location.href = authUrl;
 };
 
 window.logout = async function() {

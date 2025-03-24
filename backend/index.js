@@ -104,6 +104,12 @@ passport.use(
       prompt: 'consent'
     },
     (accessToken, refreshToken, profile, done) => {
+      console.log('Google OAuth callback received:', {
+        email: profile.emails[0].value,
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken
+      });
+      
       // Build user object
       const user = {
         email: profile.emails[0].value,
@@ -116,12 +122,22 @@ passport.use(
 );
 
 // ROUTES
-app.get('/auth/google', passport.authenticate('google'));
+app.get('/auth/google', (req, res, next) => {
+  console.log('Starting Google OAuth flow');
+  passport.authenticate('google')(req, res, next);
+});
 
 app.get(
   '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/auth/failure' }),
+  (req, res, next) => {
+    console.log('Received Google OAuth callback');
+    passport.authenticate('google', { 
+      failureRedirect: '/auth/failure',
+      failureMessage: true
+    })(req, res, next);
+  },
   (req, res) => {
+    console.log('OAuth successful, redirecting to frontend');
     // On success, redirect to your frontend
     const frontendUrl = process.env.NODE_ENV === 'production'
       ? 'https://bobbiswas69.github.io/email-sender-oauth'
@@ -130,8 +146,13 @@ app.get(
   }
 );
 
+// Add error handling for auth failures
 app.get('/auth/failure', (req, res) => {
-  res.send('Authentication failed.');
+  console.error('Auth failure:', req.session.messages);
+  res.status(401).json({ 
+    error: 'Authentication failed',
+    message: req.session.messages?.pop() || 'Unknown error'
+  });
 });
 
 // FIX LOGOUT
