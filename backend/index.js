@@ -88,7 +88,8 @@ app.use(
     name: 'sessionId',
     proxy: true,
     store: sessionStore,
-    rolling: true
+    rolling: true,
+    unset: 'destroy'
   })
 );
 
