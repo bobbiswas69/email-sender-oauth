@@ -190,6 +190,53 @@ window.scrollToSection = function(sectionId) {
   el.scrollIntoView({ behavior: 'smooth' });
 };
 
+// Helper function to make API calls with proper credentials
+async function apiCall(endpoint, options = {}) {
+  const baseUrl = config.apiUrl;
+  const defaultOptions = {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  };
+
+  try {
+    console.log(`Making API call to ${baseUrl}${endpoint}`);
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      ...defaultOptions,
+      ...options
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: errorData
+      });
+      throw new Error(`API call failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`API call successful: ${endpoint}`, data);
+    return data;
+  } catch (error) {
+    console.error(`API call failed: ${endpoint}`, error);
+    throw error;
+  }
+}
+
+// Check authentication status on page load
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await checkAuthStatus();
+  } catch (error) {
+    console.error('Error checking auth status:', error);
+    showLoginButton();
+  }
+});
+
 async function checkAuthStatus() {
   try {
     const response = await apiCall('/api/current-user');
@@ -435,3 +482,14 @@ async function sendEmail() {
     sendButton.disabled = false;
   }
 }
+
+// Make logout globally available
+window.logout = async function() {
+  try {
+    await apiCall('/logout');
+    window.location.reload();
+  } catch (error) {
+    console.error('Logout error:', error);
+    showMessage('Error logging out. Please try again.', 'error');
+  }
+};
