@@ -28,7 +28,8 @@ const api = {
         headers: {
           'Content-Type': 'application/json',
           ...options.headers
-        }
+        },
+        mode: 'cors'
       });
       
       if (!response.ok) {

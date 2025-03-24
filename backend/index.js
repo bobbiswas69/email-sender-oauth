@@ -72,7 +72,7 @@ app.use(cors({
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'fallback',
-    resave: false,
+    resave: true, // Changed to true to ensure session is saved
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === 'production',
@@ -83,10 +83,12 @@ app.use(
     },
     name: 'sessionId',
     proxy: true, // Trust the reverse proxy
-    store: new session.MemoryStore() // Use memory store for development
+    store: new session.MemoryStore(), // Use memory store for development
+    rolling: true // Enable rolling sessions
   })
 );
 
+// Initialize passport before routes
 app.use(passport.initialize());
 app.use(passport.session());
 
