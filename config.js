@@ -5,7 +5,8 @@ const config = {
   },
   production: {
     apiUrl: 'https://email-sender-oauth.onrender.com',
-    googleClientId: 'your_production_client_id' // We'll get this from Google Cloud Console
+    googleClientId: 'your_production_client_id', // We'll get this from Google Cloud Console
+    baseUrl: 'https://bobbiswas69.github.io/email-sender-oauth'
   }
 };
 

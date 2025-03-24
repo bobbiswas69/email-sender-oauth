@@ -39,8 +39,7 @@ const allowedOrigins = [
   'http://localhost:5500',
   'http://127.0.0.1:5500',
   'http://localhost:3000',
-  'https://bobbiswas69.github.io',
-  'https://bobbiswas69.github.io/email-sender-oauth'
+  'https://bobbiswas69.github.io'
 ];
 
 app.use(cors({
@@ -48,13 +47,17 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Check if the origin matches any of our allowed origins
+    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
       callback(null, true);
     } else {
+      console.log('CORS blocked for origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // EXPRESS-SESSION with secure settings
@@ -67,9 +70,11 @@ app.use(
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'strict'
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-site requests
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
     },
-    name: 'sessionId' // Change default session name
+    name: 'sessionId',
+    proxy: true // Trust the reverse proxy
   })
 );
 
@@ -182,6 +187,13 @@ app.use((err, req, res, next) => {
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
+});
+
+// Add logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  next();
 });
 
 // SEND EMAILS with validation
