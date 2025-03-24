@@ -1,4 +1,4 @@
-import config from './config.js';
+import config, { api } from './config.js';
 
 let resume = null;
 
@@ -134,29 +134,41 @@ if (emailTemplate) {
 document.addEventListener('DOMContentLoaded', () => {
   checkAuthStatus();
 
-  document.getElementById('addRecipientBtn').addEventListener('click', addRecipient);
-  document.getElementById('resumeFileInput').addEventListener('change', handleResumeUpload);
-  document.getElementById('sendBtn').addEventListener('click', sendEmails);
-
   // Initialize template preview and character counter
   const charCounter = document.createElement('div');
   charCounter.id = 'charCount';
   charCounter.className = 'char-counter';
-  document.getElementById('template-section').style.position = 'relative';
-  document.getElementById('template-section').appendChild(charCounter);
+  const templateSection = document.getElementById('template-section');
+  if (templateSection) {
+    templateSection.style.position = 'relative';
+    templateSection.appendChild(charCounter);
+  }
 
   // Load templates dropdown
   const templateSelect = document.createElement('select');
   templateSelect.id = 'templateSelect';
   templateSelect.className = 'template-select';
   templateSelect.innerHTML = '<option value="">Select a template</option>';
-  document.getElementById('template-section').insertBefore(templateSelect, document.getElementById('emailTemplate'));
+  if (templateSection) {
+    templateSection.insertBefore(templateSelect, document.getElementById('emailTemplate'));
+  }
 
   // Save template button
   const saveTemplateBtn = document.createElement('button');
   saveTemplateBtn.textContent = 'Save Template';
   saveTemplateBtn.onclick = saveTemplate;
-  document.getElementById('template-section').insertBefore(saveTemplateBtn, document.getElementById('emailTemplate'));
+  if (templateSection) {
+    templateSection.insertBefore(saveTemplateBtn, document.getElementById('emailTemplate'));
+  }
+
+  // Add event listeners only if elements exist
+  const addRecipientBtn = document.getElementById('addRecipientBtn');
+  const resumeFileInput = document.getElementById('resumeFileInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  if (addRecipientBtn) addRecipientBtn.addEventListener('click', addRecipient);
+  if (resumeFileInput) resumeFileInput.addEventListener('change', handleResumeUpload);
+  if (sendBtn) sendBtn.addEventListener('click', sendEmails);
 
   // Initialize
   loadTemplates();
@@ -178,36 +190,37 @@ window.scrollToSection = function(sectionId) {
   el.scrollIntoView({ behavior: 'smooth' });
 };
 
-function checkAuthStatus() {
-  fetch(`${config.apiUrl}/api/current-user`, { credentials: 'include' })
-    .then(resp => resp.json())
-    .then(data => {
-      const authStatus = document.getElementById('authStatus');
-      const authActions = document.getElementById('authActions');
+async function checkAuthStatus() {
+  try {
+    const data = await api.fetch('/api/current-user');
+    const authStatus = document.getElementById('authStatus');
+    const authActions = document.getElementById('authActions');
 
-      if (data.loggedIn) {
-        authStatus.textContent = `Logged in as: ${data.email}`;
-        authActions.innerHTML = `
-          <button onclick="logout()" style="margin:auto;">Logout</button>
-        `;
-      } else {
-        authStatus.textContent = 'Not logged in. Please sign in.';
-        authActions.innerHTML = `
-          <button onclick="signIn()" style="display:flex;align-items:center;gap:5px;margin:auto;">
-            <img 
-              src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg"
-              alt="G" 
-              style="width:18px;height:18px;"
-            >
-            Sign in
-          </button>
-        `;
-      }
-    })
-    .catch(err => {
-      console.error('Auth status check error:', err);
-      document.getElementById('authStatus').textContent = 'Error checking login status';
-    });
+    if (data.loggedIn) {
+      authStatus.textContent = `Logged in as: ${data.email}`;
+      authActions.innerHTML = `
+        <button onclick="logout()" style="margin:auto;">Logout</button>
+      `;
+    } else {
+      authStatus.textContent = 'Not logged in. Please sign in.';
+      authActions.innerHTML = `
+        <button onclick="signIn()" style="display:flex;align-items:center;gap:5px;margin:auto;">
+          <img 
+            src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg"
+            alt="G" 
+            style="width:18px;height:18px;"
+          >
+          Sign in
+        </button>
+      `;
+    }
+  } catch (err) {
+    console.error('Auth status check error:', err);
+    const authStatus = document.getElementById('authStatus');
+    if (authStatus) {
+      authStatus.textContent = 'Error checking login status. Please try again.';
+    }
+  }
 }
 
 // Make signIn and logout globally available
@@ -215,12 +228,14 @@ window.signIn = function() {
   window.location.href = `${config.apiUrl}/auth/google`;
 };
 
-window.logout = function() {
-  fetch(`${config.apiUrl}/logout`, { credentials: 'include' })
-    .then(() => {
-      window.location.reload();
-    })
-    .catch(err => console.error('Logout error:', err));
+window.logout = async function() {
+  try {
+    await api.fetch('/logout');
+    window.location.reload();
+  } catch (err) {
+    console.error('Logout error:', err);
+    showNotification('Error logging out. Please try again.', 'error');
+  }
 };
 
 function addRecipient() {

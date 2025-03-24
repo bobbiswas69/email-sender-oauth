@@ -21,6 +21,7 @@ const currentConfig = config[environment];
 const api = {
   async fetch(endpoint, options = {}) {
     try {
+      console.log(`Making request to: ${currentConfig.apiUrl}${endpoint}`);
       const response = await fetch(`${currentConfig.apiUrl}${endpoint}`, {
         ...options,
         credentials: 'include',
