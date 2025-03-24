@@ -90,7 +90,9 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: '/auth/google/callback',
+      callbackURL: process.env.NODE_ENV === 'production' 
+        ? 'https://email-sender-oauth.onrender.com/auth/google/callback'
+        : 'http://localhost:3000/auth/google/callback',
       scope: ['profile', 'email', 'https://mail.google.com/'],
       accessType: 'offline',
       prompt: 'consent'
@@ -115,7 +117,10 @@ app.get(
   passport.authenticate('google', { failureRedirect: '/auth/failure' }),
   (req, res) => {
     // On success, redirect to your frontend
-    res.redirect('http://localhost:5500');
+    const frontendUrl = process.env.NODE_ENV === 'production'
+      ? 'https://bobbiswas69.github.io/email-sender-oauth'
+      : 'http://localhost:5500';
+    res.redirect(frontendUrl);
   }
 );
 
@@ -136,12 +141,18 @@ app.get('/logout', (req, res) => {
         if (err) {
           console.error('Error destroying session:', err);
         }
+        res.clearCookie('sessionId');
         res.clearCookie('connect.sid');
-        res.send('Logged out');
+        
+        // Set CORS headers
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Origin', req.headers.origin);
+        
+        res.json({ success: true, message: 'Logged out successfully' });
       });
     });
   } else {
-    res.send('Already logged out');
+    res.json({ success: true, message: 'Already logged out' });
   }
 });
 
