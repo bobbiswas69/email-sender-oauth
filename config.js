@@ -1,59 +1,17 @@
-// Configuration object
 const config = {
-  // API URL based on environment
-  apiUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:3000'
-    : 'https://email-sender-oauth.onrender.com',
-
-  // Google OAuth configuration
-  googleClientId: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'YOUR_LOCAL_GOOGLE_CLIENT_ID'
-    : 'YOUR_PRODUCTION_GOOGLE_CLIENT_ID',
-
-  // Email templates
-  templates: [
-    {
-      name: 'Default Template',
-      subject: 'Regarding {Role} at {Company}',
-      body: `Dear {Name},
-
-I hope this email finds you well. I am writing to express my strong interest in the {Role} position at {Company}.
-
-I am confident that my skills and experience align well with the requirements for this role. I have attached my resume for your review.
-
-I would welcome the opportunity to discuss how I can contribute to {Company}'s success.
-
-Thank you for considering my application.
-
-Best regards,
-{UserName}`
-    },
-    {
-      name: 'Follow-up Template',
-      subject: 'Following up on {Role} Application at {Company}',
-      body: `Dear {Name},
-
-I hope this email finds you well. I wanted to follow up on my application for the {Role} position at {Company}.
-
-I remain very interested in the opportunity and would welcome the chance to discuss how I can contribute to {Company}'s team.
-
-I have attached my resume for your reference.
-
-Thank you for your time and consideration.
-
-Best regards,
-{UserName}`
-    }
-  ]
+  development: {
+    apiUrl: 'http://localhost:3000',
+    googleClientId: 'your_development_client_id'
+  },
+  production: {
+    apiUrl: 'https://email-sender-oauth.onrender.com',
+    googleClientId: 'your_production_client_id', // We'll get this from Google Cloud Console
+    baseUrl: 'https://bobbiswas69.github.io/email-sender-oauth'
+  }
 };
 
-// Export configuration
-window.config = config;
-
 // Determine environment based on hostname
-const environment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-  ? 'development' 
-  : 'production';
+const environment = window.location.hostname === 'localhost' ? 'development' : 'production';
 
 const currentConfig = config[environment];
 
@@ -103,3 +61,40 @@ if (environment === 'development') {
 }
 
 export { currentConfig as default, api };
+
+// Helper function to make API calls with proper credentials
+export async function apiCall(endpoint, options = {}) {
+  const baseUrl = config[environment].apiUrl;
+  const defaultOptions = {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  };
+
+  try {
+    console.log(`Making API call to ${baseUrl}${endpoint}`);
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      ...defaultOptions,
+      ...options
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: errorData
+      });
+      throw new Error(`API call failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`API call successful: ${endpoint}`, data);
+    return data;
+  } catch (error) {
+    console.error(`API call failed: ${endpoint}`, error);
+    throw error;
+  }
+}

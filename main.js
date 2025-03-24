@@ -190,155 +190,195 @@ window.scrollToSection = function(sectionId) {
   el.scrollIntoView({ behavior: 'smooth' });
 };
 
-// Helper function for API calls
-async function apiCall(endpoint, options = {}) {
-  const response = await fetch(`${config.apiUrl}${endpoint}`, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'API call failed');
-  }
-
-  return response.json();
-}
-
-// Check authentication status on page load
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await checkAuthStatus();
-  } catch (error) {
-    console.error('Error checking auth status:', error);
-    showLoginButton();
-  }
-});
-
-// Check authentication status
 async function checkAuthStatus() {
   try {
-    const response = await apiCall('/api/current-user');
-    if (response.loggedIn) {
-      showUserInfo(response.email);
+    console.log('Checking auth status...');
+    const data = await api.fetch('/api/current-user');
+    console.log('Auth status response:', data);
+    
+    const authStatus = document.getElementById('authStatus');
+    const authActions = document.getElementById('authActions');
+
+    if (data.loggedIn) {
+      authStatus.textContent = `Logged in as: ${data.email}`;
+      authActions.innerHTML = `
+        <button onclick="logout()" style="margin:auto;">Logout</button>
+      `;
     } else {
-      showLoginButton();
+      authStatus.textContent = 'Not logged in. Please sign in.';
+      authActions.innerHTML = `
+        <button onclick="signIn()" style="display:flex;align-items:center;gap:5px;margin:auto;">
+          <img 
+            src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg"
+            alt="G" 
+            style="width:18px;height:18px;"
+          >
+          Sign in
+        </button>
+      `;
     }
-  } catch (error) {
-    console.error('Auth check failed:', error);
-    showLoginButton();
+  } catch (err) {
+    console.error('Auth status check error:', err);
+    const authStatus = document.getElementById('authStatus');
+    if (authStatus) {
+      authStatus.textContent = 'Error checking login status. Please try again.';
+    }
   }
 }
 
-// Show login button
-function showLoginButton() {
-  document.getElementById('loginButton').style.display = 'block';
-  document.getElementById('userInfo').style.display = 'none';
-  document.getElementById('emailForm').style.display = 'none';
-}
+// Make signIn and logout globally available
+window.signIn = function() {
+  console.log('Starting sign in process...');
+  const authUrl = `${config.apiUrl}/auth/google`;
+  console.log('Redirecting to:', authUrl);
+  window.location.href = authUrl;
+};
 
-// Show user info
-function showUserInfo(email) {
-  document.getElementById('loginButton').style.display = 'none';
-  document.getElementById('userInfo').style.display = 'block';
-  document.getElementById('emailForm').style.display = 'block';
-  document.getElementById('userEmail').textContent = email;
-}
-
-// Global logout function
-async function logout() {
+window.logout = async function() {
   try {
-    await apiCall('/logout');
-    showLoginButton();
-  } catch (error) {
-    console.error('Logout failed:', error);
+    await api.fetch('/logout');
+    window.location.reload();
+  } catch (err) {
+    console.error('Logout error:', err);
+    showNotification('Error logging out. Please try again.', 'error');
   }
+};
+
+function addRecipient() {
+  const list = document.getElementById('recipient-list');
+  const newBlock = document.createElement('div');
+  newBlock.classList.add('recipient-block');
+  newBlock.innerHTML = `
+    <input type="text" name="name" placeholder="Recipient Name" required>
+    <input type="email" name="email" placeholder="Recipient Email" required>
+    <button class="remove-recipient" onclick="removeRecipient(this)">x</button>
+  `;
+  list.appendChild(newBlock);
 }
 
-// Handle form submission
-document.getElementById('emailForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  const formData = {
-    userName: document.getElementById('userName').value,
-    role: document.getElementById('role').value,
-    company: document.getElementById('company').value,
-    joblink: document.getElementById('joblink').value,
-    subject: document.getElementById('subject').value,
-    template: document.getElementById('template').value,
-    recipients: []
+function removeRecipient(btn) {
+  const block = btn.parentElement;
+  block.remove();
+}
+
+function handleResumeUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (file.type !== 'application/pdf') {
+    alert('Only PDF files are allowed.');
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const base64Str = ev.target.result.split(',')[1];
+    resume = {
+      fileName: file.name,
+      base64: base64Str
+    };
+    document.getElementById('uploadedResumeName').textContent = `Selected: ${file.name}`;
   };
+  reader.readAsDataURL(file);
+}
 
-  // Get recipients
-  const recipientRows = document.querySelectorAll('.recipient-row');
-  recipientRows.forEach(row => {
-    formData.recipients.push({
-      name: row.querySelector('.recipient-name').value,
-      email: row.querySelector('.recipient-email').value
-    });
+function loadTemplates() {
+  const templateSelect = document.querySelector('.template-select');
+  templateSelect.innerHTML = '<option value="">Select a template</option>';
+  state.templates.forEach((template, index) => {
+    const option = document.createElement('option');
+    option.value = index;
+    option.textContent = template.name;
+    templateSelect.appendChild(option);
   });
+}
 
-  // Handle resume file
-  const resumeFile = document.getElementById('resume').files[0];
-  if (resumeFile) {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
+async function sendEmails() {
+  setLoading(true);
+  
+  try {
+    // Check if user is logged in first
+    const authStatus = document.getElementById('authStatus').textContent;
+    if (!authStatus.includes('Logged in as:')) {
+      showNotification('Please sign in first', 'error');
+      setLoading(false);
+      return;
+    }
+
+    const formData = {
+      userName: document.getElementById('userNameInput').value,
+      role: document.getElementById('role').value,
+      company: document.getElementById('company').value,
+      joblink: document.getElementById('joblink').value,
+      subject: document.getElementById('subjectInput').value,
+      template: document.getElementById('emailTemplate').value,
+      recipients: Array.from(document.querySelectorAll('.recipient-block')).map(block => ({
+        name: block.querySelector('input[name="name"]').value,
+        email: block.querySelector('input[name="email"]').value
+      }))
+    };
+
+    // Validate required fields
+    if (!formData.userName || !formData.role || !formData.company || !formData.template) {
+      showNotification('Please fill in all required fields', 'error');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.recipients.length === 0) {
+      showNotification('Please add at least one recipient', 'error');
+      setLoading(false);
+      return;
+    }
+
+    // If subject is empty or unchanged, use default
+    if (!formData.subject || formData.subject === 'Regarding {Role} at {Company}') {
+      formData.subject = `Regarding ${formData.role} at ${formData.company}`;
+    }
+
+    console.log('Sending form data:', {
+      ...formData,
+      template: formData.template.substring(0, 100) + '...' // Log only first 100 chars of template
+    });
+
+    const resumeFile = document.getElementById('resumeFileInput').files[0];
+    if (resumeFile) {
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+        reader.readAsDataURL(resumeFile);
+      });
+      
       formData.resume = {
         fileName: resumeFile.name,
-        base64: e.target.result.split(',')[1]
+        base64
       };
-      await sendEmails(formData);
-    };
-    reader.readAsDataURL(resumeFile);
-  } else {
-    await sendEmails(formData);
-  }
-});
+    }
 
-// Send emails
-async function sendEmails(formData) {
-  try {
-    const button = document.getElementById('sendButton');
-    button.disabled = true;
-    button.textContent = 'Sending...';
-
-    const response = await apiCall('/send-emails', {
+    const response = await fetch(`${config.apiUrl}/send-emails`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
       body: JSON.stringify(formData)
     });
 
-    alert('Emails sent successfully!');
-    document.getElementById('emailForm').reset();
+    const data = await response.json();
+    console.log('Server response:', data);
+    
+    if (response.ok) {
+      showNotification('Emails sent successfully!', 'success');
+      // Clear form
+      document.getElementById('resumeFileInput').value = '';
+      document.getElementById('uploadedResumeName').textContent = '';
+    } else {
+      throw new Error(data.message || 'Failed to send emails');
+    }
   } catch (error) {
     console.error('Error sending emails:', error);
-    alert('Failed to send emails: ' + error.message);
+    showNotification(error.message, 'error');
   } finally {
-    const button = document.getElementById('sendButton');
-    button.disabled = false;
-    button.textContent = 'Send Emails';
+    setLoading(false);
   }
 }
-
-// Add recipient row
-document.getElementById('addRecipient').addEventListener('click', () => {
-  const container = document.getElementById('recipientsContainer');
-  const row = document.createElement('div');
-  row.className = 'recipient-row';
-  row.innerHTML = `
-    <input type="text" class="recipient-name" placeholder="Recipient Name" required>
-    <input type="email" class="recipient-email" placeholder="Recipient Email" required>
-    <button type="button" class="remove-recipient">Remove</button>
-  `;
-  container.appendChild(row);
-});
-
-// Remove recipient row
-document.getElementById('recipientsContainer').addEventListener('click', (e) => {
-  if (e.target.classList.contains('remove-recipient')) {
-    e.target.parentElement.remove();
-  }
-});
