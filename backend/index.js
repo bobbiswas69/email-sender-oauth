@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
@@ -10,7 +12,7 @@ const helmet = require('helmet');
 const xssClean = require('xss-clean');
 const hpp = require('hpp');
 const { body, validationResult } = require('express-validator');
-const { google } = require('googleapis');
+const xss = require('xss');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
@@ -84,7 +86,7 @@ app.use(
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: 'none',
-      domain: process.env.NODE_ENV === 'production' ? 'email-sender-oauth.onrender.com' : undefined,
+      domain: process.env.NODE_ENV === 'production' ? '.github.io' : undefined,
       path: '/'
     },
     name: 'sessionId',
@@ -95,236 +97,261 @@ app.use(
   })
 );
 
-// Google OAuth2 client setup
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.NODE_ENV === 'production' 
-    ? 'https://email-sender-oauth.onrender.com/auth/google/callback'
-    : 'http://localhost:3000/auth/google/callback'
-);
+// Initialize passport before routes
+app.use(passport.initialize());
+app.use(passport.session());
 
-// Token refresh function
-async function refreshAccessToken(refreshToken) {
-  try {
-    oauth2Client.setCredentials({
-      refresh_token: refreshToken
-    });
-    
-    const { tokens } = await oauth2Client.refreshAccessToken();
-    return tokens.access_token;
-  } catch (error) {
-    console.error('Error refreshing access token:', error);
-    throw error;
-  }
-}
-
-// Routes
-app.get('/api/current-user', (req, res) => {
-  console.log('Current user request received');
+// Add logging middleware before routes
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
   console.log('Session:', req.session);
-  console.log('User:', req.session.user);
+  console.log('User:', req.user);
   console.log('Cookies:', req.cookies);
   console.log('Session Store:', sessionStore);
-  
-  if (!req.session.user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  res.json(req.session.user);
+  next();
 });
 
-app.get('/auth/google', (req, res) => {
-  const authUrl = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: [
-      'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/userinfo.profile',
-      'https://www.googleapis.com/auth/gmail.send'
-    ],
-    prompt: 'consent'
-  });
-  res.redirect(authUrl);
+// PASSPORT CONFIG
+passport.serializeUser((user, done) => {
+  console.log('Serializing user:', user);
+  // Store the entire user object
+  done(null, user);
 });
 
-app.get('/auth/google/callback', async (req, res) => {
-  try {
-    const { code } = req.query;
+passport.deserializeUser((user, done) => {
+  console.log('Deserializing user:', user);
+  // Return the entire user object
+  done(null, user);
+});
+
+// Google OAuth
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.NODE_ENV === 'production' 
+        ? 'https://email-sender-oauth.onrender.com/auth/google/callback'
+        : 'http://localhost:3000/auth/google/callback',
+      scope: ['profile', 'email', 'https://mail.google.com/'],
+      accessType: 'offline',
+      prompt: 'consent'
+    },
+    (accessToken, refreshToken, profile, done) => {
+      console.log('Google OAuth callback received:', {
+        email: profile.emails[0].value,
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken
+      });
+      
+      // Build user object
+      const user = {
+        email: profile.emails[0].value,
+        accessToken,
+        refreshToken
+      };
+
+      // Log the user object before passing to done
+      console.log('Created user object:', user);
+      done(null, user);
+    }
+  )
+);
+
+// ROUTES
+app.get('/auth/google', (req, res, next) => {
+  console.log('Starting Google OAuth flow');
+  passport.authenticate('google')(req, res, next);
+});
+
+app.get(
+  '/auth/google/callback',
+  (req, res, next) => {
     console.log('Received Google OAuth callback');
+    passport.authenticate('google', { 
+      failureRedirect: '/auth/failure',
+      failureMessage: true
+    })(req, res, next);
+  },
+  (req, res) => {
+    console.log('OAuth successful, redirecting to frontend');
+    console.log('User after authentication:', req.user);
+    // On success, redirect to your frontend
+    const frontendUrl = process.env.NODE_ENV === 'production'
+      ? 'https://bobbiswas69.github.io/email-sender-oauth'
+      : 'http://localhost:5500';
+    res.redirect(frontendUrl);
+  }
+);
 
-    const { tokens } = await oauth2Client.getToken(code);
-    console.log('Received tokens from Google');
+// Add error handling for auth failures
+app.get('/auth/failure', (req, res) => {
+  console.error('Auth failure:', req.session.messages);
+  res.status(401).json({ 
+    error: 'Authentication failed',
+    message: req.session.messages?.pop() || 'Unknown error'
+  });
+});
 
-    oauth2Client.setCredentials(tokens);
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const { data } = await oauth2.userinfo.get();
-    console.log('Got user info:', data);
-
-    // Store both access and refresh tokens in session
-    req.session.user = {
-      email: data.email,
-      name: data.name,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      picture: data.picture
-    };
-
-    // Save session before redirect
-    await new Promise((resolve, reject) => {
-      req.session.save((err) => {
-        if (err) reject(err);
-        else resolve();
+// FIX LOGOUT
+app.get('/logout', (req, res) => {
+  if (req.session) {
+    // First logout from passport
+    req.logout((err) => {
+      if (err) {
+        console.error('Error logging out:', err);
+      }
+      // Then destroy the session
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Error destroying session:', err);
+        }
+        res.clearCookie('sessionId');
+        res.clearCookie('connect.sid');
+        
+        // Set CORS headers
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Origin', req.headers.origin);
+        
+        res.json({ success: true, message: 'Logged out successfully' });
       });
     });
-
-    console.log('OAuth successful, redirecting to frontend');
-    res.redirect(process.env.NODE_ENV === 'production'
-      ? 'https://bobbiswas69.github.io/email-sender-oauth/'
-      : 'http://localhost:5500/'
-    );
-  } catch (error) {
-    console.error('OAuth callback error:', error);
-    res.redirect(process.env.NODE_ENV === 'production'
-      ? 'https://bobbiswas69.github.io/email-sender-oauth/'
-      : 'http://localhost:5500/'
-    );
+  } else {
+    res.json({ success: true, message: 'Already logged out' });
   }
+});
+
+// Check current user
+app.get('/api/current-user', (req, res) => {
+  if (!req.user) {
+    return res.json({ loggedIn: false });
+  }
+  return res.json({ loggedIn: true, email: req.user.email });
 });
 
 // Input validation middleware
-const validateEmailRequest = [
-  body('userName').trim().notEmpty().withMessage('Name is required'),
-  body('role').trim().notEmpty().withMessage('Role is required'),
-  body('company').trim().notEmpty().withMessage('Company is required'),
-  body('template').trim().notEmpty().withMessage('Template is required'),
+const validateEmailInput = [
   body('recipients').isArray().withMessage('Recipients must be an array'),
-  body('recipients.*.name').trim().notEmpty().withMessage('Recipient name is required'),
-  body('recipients.*.email').isEmail().withMessage('Invalid recipient email')
+  body('recipients.*.name').notEmpty().withMessage('Recipient name is required'),
+  body('recipients.*.email').isEmail().withMessage('Invalid recipient email'),
+  body('subject').notEmpty().withMessage('Subject is required'),
+  body('template').notEmpty().withMessage('Email template is required')
 ];
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-  });
-});
-
-// SEND EMAILS with validation
-app.post('/send-emails', 
-  emailLimiter, // Apply rate limiting
-  validateEmailRequest, // Apply input validation
-  async (req, res) => {
-    // Check for validation errors
+// Send emails endpoint
+app.post('/send-emails', emailLimiter, validateEmailInput, async (req, res) => {
+  try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    if (!req.user) {
-      return res.status(401).json({ error: 'Not authenticated' });
+    const { recipients, subject, template, userName, role, company, joblink, resume } = req.body;
+    const user = req.user;
+
+    if (!user || !user.accessToken) {
+      return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const { accessToken, refreshToken, email } = req.user;
-    const { userName, role, company, joblink, subject, template, recipients, resume } = req.body;
+    console.log('Starting email send process for user:', user.email);
+    console.log('Number of recipients:', recipients.length);
 
-    // Sanitize inputs
-    const sanitizedTemplate = template;
-    const sanitizedSubject = subject
-      .replace(/\{Role\}/g, xss(role))
-      .replace(/\{Company\}/g, xss(company))
-      .replace(/\{UserName\}/g, xss(userName));
-
-    // Create nodemailer transport with OAuth2
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         type: 'OAuth2',
-        user: email,
+        user: user.email,
         clientId: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        accessToken,
-        refreshToken
+        refreshToken: user.refreshToken,
+        accessToken: user.accessToken
       }
     });
 
-    try {
-      const results = [];
-      for (const r of recipients) {
-        const { name, email: recEmail } = r;
+    const results = [];
+    for (const recipient of recipients) {
+      try {
+        console.log('Processing recipient:', recipient.email);
+        
+        // Replace template variables
+        let personalizedTemplate = template
+          .replace(/\{Name\}/g, recipient.name)
+          .replace(/\{Role\}/g, role)
+          .replace(/\{Company\}/g, company)
+          .replace(/\{JobLink\}/g, joblink)
+          .replace(/\{UserName\}/g, userName);
 
-        // Replace placeholders in the template
-        const personalizedBody = sanitizedTemplate
-          .replace(/\{Name\}/g, xss(name))
-          .replace(/\{Role\}/g, xss(role))
-          .replace(/\{Company\}/g, xss(company))
-          .replace(/\{JobLink\}/g, joblink ? xss(joblink) : '')
-          .replace(/\{UserName\}/g, xss(userName));
-
-        // Convert newlines to <br> for HTML
-        const htmlBody = personalizedBody.replace(/\n/g, '<br>');
-
+        // Prepare email options
         const mailOptions = {
-          from: email,
-          to: recEmail,
-          subject: sanitizedSubject,
-          html: htmlBody
+          from: user.email,
+          to: recipient.email,
+          subject: subject
+            .replace(/\{Role\}/g, role)
+            .replace(/\{Company\}/g, company),
+          text: personalizedTemplate,
+          html: personalizedTemplate.replace(/\n/g, '<br>')
         };
 
-        if (resume && resume.fileName && resume.base64) {
-          // Validate file size (max 10MB)
-          const fileSize = Buffer.from(resume.base64, 'base64').length;
-          if (fileSize > 10 * 1024 * 1024) {
-            throw new Error('Resume file size exceeds 10MB limit');
-          }
-
-          mailOptions.attachments = [
-            {
-              filename: resume.fileName,
-              content: resume.base64,
-              encoding: 'base64'
-            }
-          ];
+        // Add resume attachment if provided
+        if (resume) {
+          mailOptions.attachments = [{
+            filename: resume.fileName,
+            content: resume.base64,
+            encoding: 'base64'
+          }];
         }
 
-        console.log('Attempting to send email to:', recEmail);
+        console.log('Sending email to:', recipient.email);
         console.log('Mail options:', {
-          from: mailOptions.from,
-          to: mailOptions.to,
+          from: user.email,
+          to: recipient.email,
           subject: mailOptions.subject,
           hasAttachments: !!mailOptions.attachments
         });
 
-        const result = await transporter.sendMail(mailOptions);
-        console.log('Email sent successfully:', result.messageId);
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent successfully:', info.messageId);
         results.push({
-          recipient: recEmail,
+          email: recipient.email,
           status: 'success',
-          messageId: result.messageId
+          messageId: info.messageId
+        });
+      } catch (error) {
+        console.error('Error sending email to:', recipient.email, error);
+        results.push({
+          email: recipient.email,
+          status: 'error',
+          error: error.message
         });
       }
+    }
 
-      res.json({
-        success: true,
-        message: 'Emails sent successfully',
-        results
-      });
-    } catch (err) {
-      console.error('Detailed error sending emails:', {
-        error: err.message,
-        stack: err.stack,
-        code: err.code,
-        command: err.command
-      });
-      res.status(500).json({
-        error: 'Failed to send emails',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
+    // Check if any emails were sent successfully
+    const successCount = results.filter(r => r.status === 'success').length;
+    if (successCount === 0) {
+      return res.status(500).json({
+        error: 'Failed to send any emails',
+        details: results
       });
     }
+
+    // Return results
+    res.json({
+      message: `Successfully sent ${successCount} out of ${recipients.length} emails`,
+      results
+    });
+  } catch (error) {
+    console.error('Detailed error sending emails:', error);
+    res.status(500).json({ 
+      error: 'Failed to send emails',
+      details: error.message,
+      stack: error.stack
+    });
   }
-);
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log('Server running on port', PORT);
 });

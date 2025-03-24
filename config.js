@@ -1,14 +1,54 @@
+// Configuration object
 const config = {
-  development: {
-    apiUrl: 'http://localhost:3000',
-    googleClientId: 'your_development_client_id'
-  },
-  production: {
-    apiUrl: 'https://email-sender-oauth.onrender.com',
-    googleClientId: 'your_production_client_id', // We'll get this from Google Cloud Console
-    baseUrl: 'https://bobbiswas69.github.io/email-sender-oauth'
-  }
+  // API URL based on environment
+  apiUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3000'
+    : 'https://email-sender-oauth.onrender.com',
+
+  // Google OAuth configuration
+  googleClientId: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'YOUR_LOCAL_GOOGLE_CLIENT_ID'
+    : 'YOUR_PRODUCTION_GOOGLE_CLIENT_ID',
+
+  // Email templates
+  templates: [
+    {
+      name: 'Default Template',
+      subject: 'Regarding {Role} at {Company}',
+      body: `Dear {Name},
+
+I hope this email finds you well. I am writing to express my strong interest in the {Role} position at {Company}.
+
+I am confident that my skills and experience align well with the requirements for this role. I have attached my resume for your review.
+
+I would welcome the opportunity to discuss how I can contribute to {Company}'s success.
+
+Thank you for considering my application.
+
+Best regards,
+{UserName}`
+    },
+    {
+      name: 'Follow-up Template',
+      subject: 'Following up on {Role} Application at {Company}',
+      body: `Dear {Name},
+
+I hope this email finds you well. I wanted to follow up on my application for the {Role} position at {Company}.
+
+I remain very interested in the opportunity and would welcome the chance to discuss how I can contribute to {Company}'s team.
+
+I have attached my resume for your reference.
+
+Thank you for your time and consideration.
+
+Best regards,
+{UserName}`
+    }
+  ]
 };
+
+// Export configuration
+window.config = config;
 
 // Determine environment based on hostname
 const environment = window.location.hostname === 'localhost' ? 'development' : 'production';
