@@ -17,7 +17,8 @@ const app = express();
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "unsafe-none" }
 })); // Adds various HTTP headers for security
 app.use(xssClean()); // Prevent XSS attacks
 app.use(hpp()); // Prevent HTTP Parameter Pollution
@@ -82,7 +83,7 @@ app.use(
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: 'none',
-      domain: process.env.NODE_ENV === 'production' ? '.github.io' : undefined,
+      domain: process.env.NODE_ENV === 'production' ? 'email-sender-oauth.onrender.com' : undefined,
       path: '/'
     },
     name: 'sessionId',

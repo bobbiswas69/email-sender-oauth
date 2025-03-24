@@ -11,9 +11,7 @@ const config = {
 };
 
 // Determine environment based on hostname
-const environment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-  ? 'development' 
-  : 'production';
+const environment = window.location.hostname === 'localhost' ? 'development' : 'production';
 
 const currentConfig = config[environment];
 
@@ -63,3 +61,40 @@ if (environment === 'development') {
 }
 
 export { currentConfig as default, api };
+
+// Helper function to make API calls with proper credentials
+export async function apiCall(endpoint, options = {}) {
+  const baseUrl = config[environment].apiUrl;
+  const defaultOptions = {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  };
+
+  try {
+    console.log(`Making API call to ${baseUrl}${endpoint}`);
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+      ...defaultOptions,
+      ...options
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: errorData
+      });
+      throw new Error(`API call failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`API call successful: ${endpoint}`, data);
+    return data;
+  } catch (error) {
+    console.error(`API call failed: ${endpoint}`, error);
+    throw error;
+  }
+}
