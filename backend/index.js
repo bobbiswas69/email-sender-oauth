@@ -62,6 +62,9 @@ app.use(cors({
   preflightContinue: false
 }));
 
+// Add trust proxy for secure cookies
+app.set('trust proxy', 1);
+
 // EXPRESS-SESSION with secure settings
 app.use(
   session({
@@ -73,7 +76,7 @@ app.use(
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: 'none', // Changed to 'none' for cross-site requests
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+      domain: process.env.NODE_ENV === 'production' ? 'bobbiswas69.github.io' : undefined
     },
     name: 'sessionId',
     proxy: true, // Trust the reverse proxy
@@ -218,6 +221,7 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   console.log('Headers:', req.headers);
   console.log('Session:', req.session);
+  console.log('User:', req.user);
   next();
 });
 
