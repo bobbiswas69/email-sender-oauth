@@ -2,12 +2,134 @@ import config from './config.js';
 
 let resume = null;
 
+// DOM Elements
+const authStatus = document.getElementById('authStatus');
+const actions = document.getElementById('actions');
+const sendButton = document.getElementById('sendButton');
+const emailTemplate = document.getElementById('emailTemplate');
+const templatePreview = document.getElementById('templatePreview');
+const templateSelect = document.getElementById('templateSelect');
+
 // State management
 let state = {
-  isDarkMode: localStorage.getItem('darkMode') === 'true',
-  templates: JSON.parse(localStorage.getItem('templates') || '[]'),
-  currentTemplate: null
+  darkMode: localStorage.getItem('darkMode') === 'true',
+  templates: JSON.parse(localStorage.getItem('templates') || '[]')
 };
+
+// Theme toggle
+const themeToggle = document.createElement('button');
+themeToggle.className = 'theme-toggle';
+themeToggle.innerHTML = state.darkMode ? '☀️' : '🌙';
+themeToggle.onclick = () => {
+  state.darkMode = !state.darkMode;
+  localStorage.setItem('darkMode', state.darkMode);
+  document.body.classList.toggle('dark-mode');
+  themeToggle.innerHTML = state.darkMode ? '☀️' : '🌙';
+};
+document.body.appendChild(themeToggle);
+
+// Initialize dark mode
+if (state.darkMode) {
+  document.body.classList.add('dark-mode');
+}
+
+// Notification system
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.classList.add('show');
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+  }, 100);
+}
+
+// Loading state
+function setLoading(isLoading) {
+  if (sendButton) {
+    sendButton.disabled = isLoading;
+    sendButton.innerHTML = isLoading ? 
+      '<span class="loading-spinner"></span> Sending...' : 
+      'Send Emails';
+  }
+}
+
+// Template preview
+function updateTemplatePreview() {
+  if (!emailTemplate || !templatePreview) return;
+  
+  const template = emailTemplate.value;
+  const preview = template
+    .replace(/\{Name\}/g, 'John Doe')
+    .replace(/\{Role\}/g, 'Software Engineer')
+    .replace(/\{Company\}/g, 'Tech Corp')
+    .replace(/\{JobLink\}/g, 'https://example.com/job')
+    .replace(/\{UserName\}/g, 'Your Name');
+  
+  templatePreview.innerHTML = preview.replace(/\n/g, '<br>');
+}
+
+// Character counter
+function updateCharacterCount() {
+  if (!emailTemplate) return;
+  const count = emailTemplate.value.length;
+  const counter = document.getElementById('charCount');
+  if (counter) {
+    counter.textContent = `${count}/5000 characters`;
+  }
+}
+
+// Template management
+function saveTemplate() {
+  if (!emailTemplate) return;
+  const name = prompt('Enter template name:');
+  if (!name) return;
+  
+  state.templates.push({
+    name,
+    content: emailTemplate.value
+  });
+  localStorage.setItem('templates', JSON.stringify(state.templates));
+  updateTemplateSelect();
+  showNotification('Template saved successfully', 'success');
+}
+
+function updateTemplateSelect() {
+  if (!templateSelect) return;
+  
+  templateSelect.innerHTML = '<option value="">Select a template</option>';
+  state.templates.forEach((template, index) => {
+    const option = document.createElement('option');
+    option.value = index;
+    option.textContent = template.name;
+    templateSelect.appendChild(option);
+  });
+}
+
+// Initialize template select
+if (templateSelect) {
+  updateTemplateSelect();
+  templateSelect.addEventListener('change', (e) => {
+    if (emailTemplate && e.target.value !== '') {
+      emailTemplate.value = state.templates[e.target.value].content;
+      updateTemplatePreview();
+      updateCharacterCount();
+    }
+  });
+}
+
+// Event listeners
+if (emailTemplate) {
+  emailTemplate.addEventListener('input', () => {
+    updateTemplatePreview();
+    updateCharacterCount();
+  });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   checkAuthStatus();
@@ -145,85 +267,6 @@ function handleResumeUpload(e) {
   reader.readAsDataURL(file);
 }
 
-// Notifications
-function showNotification(message, type = 'info') {
-  const notification = document.createElement('div');
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  document.body.appendChild(notification);
-  
-  setTimeout(() => {
-    notification.style.animation = 'slideOut 0.3s ease-out';
-    setTimeout(() => notification.remove(), 300);
-  }, 3000);
-}
-
-// Loading state
-function setLoading(isLoading) {
-  const sendBtn = document.getElementById('sendBtn');
-  sendBtn.disabled = isLoading;
-  if (isLoading) {
-    sendBtn.innerHTML = '<span class="loading-spinner"></span>Sending...';
-  } else {
-    sendBtn.textContent = 'Send Emails';
-  }
-}
-
-// Theme toggle
-function toggleTheme() {
-  state.isDarkMode = !state.isDarkMode;
-  localStorage.setItem('darkMode', state.isDarkMode);
-  updateTheme();
-}
-
-function updateTheme() {
-  document.body.classList.toggle('dark-mode', state.isDarkMode);
-  const themeToggle = document.querySelector('.theme-toggle');
-  themeToggle.innerHTML = state.isDarkMode ? '☀️' : '🌙';
-}
-
-// Template preview
-function updateTemplatePreview() {
-  const emailTemplate = document.getElementById('emailTemplate');
-  const preview = emailTemplate.value
-    .replace(/\{Name\}/g, 'John Doe')
-    .replace(/\{Role\}/g, 'Software Engineer')
-    .replace(/\{Company\}/g, 'Example Corp')
-    .replace(/\{JobLink\}/g, 'https://example.com/job')
-    .replace(/\{UserName\}/g, 'Your Name');
-  
-  const templatePreview = document.querySelector('.template-preview');
-  templatePreview.innerHTML = preview;
-}
-
-// Character counter
-function updateCharCount() {
-  const emailTemplate = document.getElementById('emailTemplate');
-  const count = emailTemplate.value.length;
-  const charCounter = document.querySelector('.char-counter');
-  charCounter.textContent = `${count} characters`;
-}
-
-// Template management
-function saveTemplate() {
-  // Check if user is logged in
-  if (!document.getElementById('authStatus').textContent.includes('Logged in as:')) {
-    showNotification('Please sign in to save templates', 'error');
-    return;
-  }
-
-  const template = {
-    name: prompt('Enter template name:'),
-    content: document.getElementById('emailTemplate').value
-  };
-  
-  if (template.name) {
-    state.templates.push(template);
-    localStorage.setItem('templates', JSON.stringify(state.templates));
-    showNotification('Template saved successfully', 'success');
-  }
-}
-
 function loadTemplates() {
   const templateSelect = document.querySelector('.template-select');
   templateSelect.innerHTML = '<option value="">Select a template</option>';
@@ -234,14 +277,6 @@ function loadTemplates() {
     templateSelect.appendChild(option);
   });
 }
-
-templateSelect.addEventListener('change', (e) => {
-  if (e.target.value !== '') {
-    document.getElementById('emailTemplate').value = state.templates[e.target.value].content;
-    updateTemplatePreview();
-    updateCharCount();
-  }
-});
 
 async function sendEmails() {
   setLoading(true);

@@ -11,4 +11,31 @@ const config = {
 };
 
 const environment = window.location.hostname === 'localhost' ? 'development' : 'production';
-export default config[environment];
+const currentConfig = config[environment];
+
+// Add error handling for API calls
+const api = {
+  async fetch(endpoint, options = {}) {
+    try {
+      const response = await fetch(`${currentConfig.apiUrl}${endpoint}`, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }
+};
+
+export { currentConfig as default, api };
