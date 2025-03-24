@@ -11,6 +11,7 @@ const xssClean = require('xss-clean');
 const xss = require('xss');
 const hpp = require('hpp');
 const { body, validationResult } = require('express-validator');
+const { google } = require('googleapis');
 
 const app = express();
 
@@ -123,64 +124,144 @@ passport.deserializeUser((user, done) => {
 });
 
 // Google OAuth
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.NODE_ENV === 'production' 
-        ? 'https://email-sender-oauth.onrender.com/auth/google/callback'
-        : 'http://localhost:3000/auth/google/callback',
-      scope: ['profile', 'email', 'https://mail.google.com/'],
-      accessType: 'offline',
-      prompt: 'consent'
-    },
-    (accessToken, refreshToken, profile, done) => {
-      console.log('Google OAuth callback received:', {
-        email: profile.emails[0].value,
-        hasAccessToken: !!accessToken,
-        hasRefreshToken: !!refreshToken
-      });
-      
-      // Build user object
-      const user = {
-        email: profile.emails[0].value,
-        accessToken,
-        refreshToken
-      };
-      
-      // Log the user object before passing to done
-      console.log('Created user object:', user);
-      done(null, user);
-    }
-  )
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.NODE_ENV === 'production' 
+    ? 'https://email-sender-oauth.onrender.com/auth/google/callback'
+    : 'http://localhost:3000/auth/google/callback'
 );
+
+// Add this function before the routes
+async function refreshAccessToken(refreshToken) {
+  try {
+    oauth2Client.setCredentials({
+      refresh_token: refreshToken
+    });
+    
+    const { tokens } = await oauth2Client.refreshAccessToken();
+    return tokens.access_token;
+  } catch (error) {
+    console.error('Error refreshing access token:', error);
+    throw error;
+  }
+}
+
+// Update the sendEmail function
+async function sendEmail(req, res) {
+  try {
+    const { to, subject, text, html, hasAttachments } = req.body;
+    const user = req.session.user;
+
+    if (!user || !user.accessToken || !user.refreshToken) {
+      console.error('User not authenticated or missing tokens');
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    console.log('Attempting to send email to:', to);
+    console.log('Mail options:', {
+      from: user.email,
+      to,
+      subject,
+      hasAttachments
+    });
+
+    let accessToken = user.accessToken;
+    
+    // Try to refresh the token if it's expired
+    try {
+      accessToken = await refreshAccessToken(user.refreshToken);
+      // Update the session with the new access token
+      req.session.user.accessToken = accessToken;
+      await new Promise((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    } catch (refreshError) {
+      console.error('Error refreshing token:', refreshError);
+      // If refresh fails, clear the session and require re-authentication
+      req.session.destroy();
+      return res.status(401).json({ 
+        error: 'Authentication expired. Please log in again.',
+        redirect: '/'
+      });
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        type: 'OAuth2',
+        user: user.email,
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        refreshToken: user.refreshToken,
+        accessToken: accessToken
+      }
+    });
+
+    // ... rest of the sendEmail function remains the same ...
+  } catch (error) {
+    console.error('Detailed error sending emails:', error);
+    res.status(500).json({ 
+      error: 'Failed to send email',
+      details: error.message,
+      stack: error.stack
+    });
+  }
+}
+
+// Update the Google OAuth callback route
+app.get('/auth/google/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    console.log('Received Google OAuth callback');
+
+    const { tokens } = await oauth2Client.getToken(code);
+    console.log('Received tokens from Google');
+
+    oauth2Client.setCredentials(tokens);
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const { data } = await oauth2.userinfo.get();
+    console.log('Got user info:', data);
+
+    // Store both access and refresh tokens in session
+    req.session.user = {
+      email: data.email,
+      name: data.name,
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      picture: data.picture
+    };
+
+    // Save session before redirect
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    console.log('OAuth successful, redirecting to frontend');
+    res.redirect(process.env.NODE_ENV === 'production'
+      ? 'https://bobbiswas69.github.io/email-sender-oauth/'
+      : 'http://localhost:5500/'
+    );
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.redirect(process.env.NODE_ENV === 'production'
+      ? 'https://bobbiswas69.github.io/email-sender-oauth/'
+      : 'http://localhost:5500/'
+    );
+  }
+});
 
 // ROUTES
 app.get('/auth/google', (req, res, next) => {
   console.log('Starting Google OAuth flow');
   passport.authenticate('google')(req, res, next);
 });
-
-app.get(
-  '/auth/google/callback',
-  (req, res, next) => {
-    console.log('Received Google OAuth callback');
-    passport.authenticate('google', { 
-      failureRedirect: '/auth/failure',
-      failureMessage: true
-    })(req, res, next);
-  },
-  (req, res) => {
-    console.log('OAuth successful, redirecting to frontend');
-    console.log('User after authentication:', req.user);
-    // On success, redirect to your frontend
-    const frontendUrl = process.env.NODE_ENV === 'production'
-      ? 'https://bobbiswas69.github.io/email-sender-oauth'
-      : 'http://localhost:5500';
-    res.redirect(frontendUrl);
-  }
-);
 
 // Add error handling for auth failures
 app.get('/auth/failure', (req, res) => {

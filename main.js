@@ -382,3 +382,51 @@ async function sendEmails() {
     setLoading(false);
   }
 }
+
+async function sendEmail() {
+  try {
+    const to = document.getElementById('to').value;
+    const subject = document.getElementById('subject').value;
+    const message = document.getElementById('message').value;
+    const hasAttachments = document.getElementById('resume').files.length > 0;
+
+    // Show loading state
+    const sendButton = document.getElementById('sendButton');
+    const originalText = sendButton.textContent;
+    sendButton.textContent = 'Sending...';
+    sendButton.disabled = true;
+
+    const response = await apiCall('/api/send-email', {
+      method: 'POST',
+      body: JSON.stringify({
+        to,
+        subject,
+        text: message,
+        html: message.replace(/\n/g, '<br>'),
+        hasAttachments
+      })
+    });
+
+    // Check if we need to redirect due to authentication error
+    if (response.error === 'Authentication expired. Please log in again.') {
+      window.location.href = response.redirect;
+      return;
+    }
+
+    // Show success message
+    showMessage('Email sent successfully!', 'success');
+    document.getElementById('emailForm').reset();
+  } catch (error) {
+    console.error('Error sending email:', error);
+    if (error.message.includes('Authentication expired')) {
+      window.location.href = '/';
+    } else {
+      showMessage('Failed to send email. Please try again.', 'error');
+    }
+  } finally {
+    // Reset button state
+    const sendButton = document.getElementById('sendButton');
+    sendButton.textContent = originalText;
+    sendButton.disabled = false;
+  }
+}
