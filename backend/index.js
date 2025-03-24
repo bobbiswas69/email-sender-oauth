@@ -57,8 +57,9 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Set-Cookie']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie'],
+  exposedHeaders: ['Set-Cookie'],
+  preflightContinue: false
 }));
 
 // EXPRESS-SESSION with secure settings
@@ -71,11 +72,12 @@ app.use(
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'lax', // Changed from 'strict' to 'lax' for cross-site requests
+      sameSite: 'none', // Changed to 'none' for cross-site requests
       domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
     },
     name: 'sessionId',
-    proxy: true // Trust the reverse proxy
+    proxy: true, // Trust the reverse proxy
+    store: new session.MemoryStore() // Use memory store for development
   })
 );
 
@@ -211,10 +213,11 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Add logging middleware
+// Add logging middleware before routes
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   console.log('Headers:', req.headers);
+  console.log('Session:', req.session);
   next();
 });
 
