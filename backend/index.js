@@ -15,7 +15,10 @@ const { body, validationResult } = require('express-validator');
 const app = express();
 
 // Security middleware
-app.use(helmet()); // Adds various HTTP headers for security
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+})); // Adds various HTTP headers for security
 app.use(xssClean()); // Prevent XSS attacks
 app.use(hpp()); // Prevent HTTP Parameter Pollution
 
@@ -33,6 +36,9 @@ const emailLimiter = rateLimit({
 });
 
 app.use(express.json());
+
+// Add trust proxy for secure cookies
+app.set('trust proxy', 1);
 
 // CORS configuration
 const allowedOrigins = [
@@ -62,9 +68,6 @@ app.use(cors({
   preflightContinue: false
 }));
 
-// Add trust proxy for secure cookies
-app.set('trust proxy', 1);
-
 // EXPRESS-SESSION with secure settings
 app.use(
   session({
@@ -76,7 +79,7 @@ app.use(
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: 'none', // Changed to 'none' for cross-site requests
-      domain: process.env.NODE_ENV === 'production' ? 'bobbiswas69.github.io' : undefined
+      domain: process.env.NODE_ENV === 'production' ? '.github.io' : undefined
     },
     name: 'sessionId',
     proxy: true, // Trust the reverse proxy
@@ -87,11 +90,24 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Add logging middleware before routes
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  console.log('Session:', req.session);
+  console.log('User:', req.user);
+  console.log('Cookies:', req.cookies);
+  next();
+});
+
 // PASSPORT CONFIG
 passport.serializeUser((user, done) => {
+  console.log('Serializing user:', user);
   done(null, user);
 });
+
 passport.deserializeUser((obj, done) => {
+  console.log('Deserializing user:', obj);
   done(null, obj);
 });
 
@@ -214,15 +230,6 @@ app.use((err, req, res, next) => {
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
-});
-
-// Add logging middleware before routes
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Headers:', req.headers);
-  console.log('Session:', req.session);
-  console.log('User:', req.user);
-  next();
 });
 
 // SEND EMAILS with validation

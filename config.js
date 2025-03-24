@@ -36,7 +36,8 @@ const api = {
         console.error('API Error Response:', {
           status: response.status,
           statusText: response.statusText,
-          error: errorData
+          error: errorData,
+          headers: Object.fromEntries(response.headers.entries())
         });
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
