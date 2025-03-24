@@ -43,11 +43,6 @@ const allowedOrigins = [
   'https://bobbiswas69.github.io/email-sender-oauth'
 ];
 
-// Add GitHub Pages URL if it exists in environment
-if (process.env.GITHUB_PAGES_URL) {
-  allowedOrigins.push(process.env.GITHUB_PAGES_URL);
-}
-
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
