@@ -10,7 +10,11 @@ const config = {
   }
 };
 
-const environment = window.location.hostname === 'localhost' ? 'development' : 'production';
+// Determine environment based on hostname
+const environment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+  ? 'development' 
+  : 'production';
+
 const currentConfig = config[environment];
 
 // Add error handling for API calls
@@ -37,5 +41,10 @@ const api = {
     }
   }
 };
+
+// Log current configuration (development only)
+if (environment === 'development') {
+  console.log('Current config:', currentConfig);
+}
 
 export { currentConfig as default, api };

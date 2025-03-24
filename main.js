@@ -75,7 +75,7 @@ function updateTemplatePreview() {
 }
 
 // Character counter
-function updateCharacterCount() {
+function updateCharCount() {
   if (!emailTemplate) return;
   const count = emailTemplate.value.length;
   const counter = document.getElementById('charCount');
@@ -118,7 +118,7 @@ if (templateSelect) {
     if (emailTemplate && e.target.value !== '') {
       emailTemplate.value = state.templates[e.target.value].content;
       updateTemplatePreview();
-      updateCharacterCount();
+      updateCharCount();
     }
   });
 }
@@ -127,7 +127,7 @@ if (templateSelect) {
 if (emailTemplate) {
   emailTemplate.addEventListener('input', () => {
     updateTemplatePreview();
-    updateCharacterCount();
+    updateCharCount();
   });
 }
 
@@ -140,12 +140,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize template preview and character counter
   const charCounter = document.createElement('div');
+  charCounter.id = 'charCount';
   charCounter.className = 'char-counter';
   document.getElementById('template-section').style.position = 'relative';
   document.getElementById('template-section').appendChild(charCounter);
 
   // Load templates dropdown
   const templateSelect = document.createElement('select');
+  templateSelect.id = 'templateSelect';
   templateSelect.className = 'template-select';
   templateSelect.innerHTML = '<option value="">Select a template</option>';
   document.getElementById('template-section').insertBefore(templateSelect, document.getElementById('emailTemplate'));
@@ -160,13 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTemplates();
   updateCharCount();
   updateTemplatePreview();
-
-  // Add event listeners
-  const emailTemplate = document.getElementById('emailTemplate');
-  emailTemplate.addEventListener('input', () => {
-    updateTemplatePreview();
-    updateCharCount();
-  });
 });
 
 // Smooth scroll
@@ -184,7 +179,7 @@ window.scrollToSection = function(sectionId) {
 };
 
 function checkAuthStatus() {
-  fetch('http://localhost:3000/api/current-user', { credentials: 'include' })
+  fetch(`${config.apiUrl}/api/current-user`, { credentials: 'include' })
     .then(resp => resp.json())
     .then(data => {
       const authStatus = document.getElementById('authStatus');
@@ -197,7 +192,6 @@ function checkAuthStatus() {
         `;
       } else {
         authStatus.textContent = 'Not logged in. Please sign in.';
-        // use the new g icon link
         authActions.innerHTML = `
           <button onclick="signIn()" style="display:flex;align-items:center;gap:5px;margin:auto;">
             <img 
@@ -211,22 +205,22 @@ function checkAuthStatus() {
       }
     })
     .catch(err => {
-      console.error(err);
+      console.error('Auth status check error:', err);
       document.getElementById('authStatus').textContent = 'Error checking login status';
     });
 }
 
 // Make signIn and logout globally available
 window.signIn = function() {
-  window.location.href = 'http://localhost:3000/auth/google';
+  window.location.href = `${config.apiUrl}/auth/google`;
 };
 
 window.logout = function() {
-  fetch('http://localhost:3000/logout', { credentials: 'include' })
+  fetch(`${config.apiUrl}/logout`, { credentials: 'include' })
     .then(() => {
       window.location.reload();
     })
-    .catch(err => console.error(err));
+    .catch(err => console.error('Logout error:', err));
 };
 
 function addRecipient() {
