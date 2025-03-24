@@ -68,23 +68,27 @@ app.use(cors({
   preflightContinue: false
 }));
 
+// Create a persistent session store
+const sessionStore = new session.MemoryStore();
+
 // EXPRESS-SESSION with secure settings
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'fallback',
-    resave: true, // Changed to true to ensure session is saved
+    resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'none', // Changed to 'none' for cross-site requests
-      domain: process.env.NODE_ENV === 'production' ? '.github.io' : undefined
+      sameSite: 'none',
+      domain: process.env.NODE_ENV === 'production' ? '.github.io' : undefined,
+      path: '/'
     },
     name: 'sessionId',
-    proxy: true, // Trust the reverse proxy
-    store: new session.MemoryStore(), // Use memory store for development
-    rolling: true // Enable rolling sessions
+    proxy: true,
+    store: sessionStore,
+    rolling: true
   })
 );
 
@@ -99,6 +103,7 @@ app.use((req, res, next) => {
   console.log('Session:', req.session);
   console.log('User:', req.user);
   console.log('Cookies:', req.cookies);
+  console.log('Session Store:', sessionStore);
   next();
 });
 

@@ -29,7 +29,9 @@ const api = {
           'Content-Type': 'application/json',
           ...options.headers
         },
-        mode: 'cors'
+        mode: 'cors',
+        cache: 'no-cache',
+        redirect: 'follow'
       });
       
       if (!response.ok) {
