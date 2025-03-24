@@ -4,8 +4,8 @@ const config = {
     googleClientId: 'your_development_client_id'
   },
   production: {
-    apiUrl: 'http://localhost:3000', // We'll update this after backend deployment
-    googleClientId: 'your_production_client_id' // We'll get this from Google Cloud Console one more change
+    apiUrl: 'https://oneclick-mailer-backend.onrender.com', // We'll update this with your actual Render URL
+    googleClientId: 'your_production_client_id' // We'll get this from Google Cloud Console
   }
 };
 
