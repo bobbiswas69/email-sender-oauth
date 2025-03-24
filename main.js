@@ -192,57 +192,62 @@ window.scrollToSection = function(sectionId) {
 
 async function checkAuthStatus() {
   try {
-    console.log('Checking auth status...');
-    const data = await api.fetch('/api/current-user');
-    console.log('Auth status response:', data);
-    
-    const authStatus = document.getElementById('authStatus');
-    const authActions = document.getElementById('authActions');
-
-    if (data.loggedIn) {
-      authStatus.textContent = `Logged in as: ${data.email}`;
-      authActions.innerHTML = `
-        <button onclick="logout()" style="margin:auto;">Logout</button>
-      `;
-    } else {
-      authStatus.textContent = 'Not logged in. Please sign in.';
-      authActions.innerHTML = `
-        <button onclick="signIn()" style="display:flex;align-items:center;gap:5px;margin:auto;">
-          <img 
-            src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg"
-            alt="G" 
-            style="width:18px;height:18px;"
-          >
-          Sign in
-        </button>
-      `;
+    const response = await apiCall('/api/current-user');
+    if (response.error === 'Not authenticated') {
+      showLoginButton();
+      return false;
     }
-  } catch (err) {
-    console.error('Auth status check error:', err);
-    const authStatus = document.getElementById('authStatus');
-    if (authStatus) {
-      authStatus.textContent = 'Error checking login status. Please try again.';
-    }
+    showUserInfo(response);
+    return true;
+  } catch (error) {
+    console.error('Auth status check failed:', error);
+    showLoginButton();
+    return false;
   }
 }
 
-// Make signIn and logout globally available
-window.signIn = function() {
-  console.log('Starting sign in process...');
-  const authUrl = `${config.apiUrl}/auth/google`;
-  console.log('Redirecting to:', authUrl);
-  window.location.href = authUrl;
-};
-
-window.logout = async function() {
-  try {
-    await api.fetch('/logout');
-    window.location.reload();
-  } catch (err) {
-    console.error('Logout error:', err);
-    showNotification('Error logging out. Please try again.', 'error');
+function showLoginButton() {
+  const loginButton = document.getElementById('loginButton');
+  const userInfo = document.getElementById('userInfo');
+  const emailForm = document.getElementById('emailForm');
+  
+  if (loginButton) {
+    loginButton.style.display = 'block';
+    loginButton.onclick = () => {
+      window.location.href = `${config.apiUrl}/auth/google`;
+    };
   }
-};
+  
+  if (userInfo) {
+    userInfo.style.display = 'none';
+  }
+  
+  if (emailForm) {
+    emailForm.style.display = 'none';
+  }
+}
+
+function showUserInfo(user) {
+  const loginButton = document.getElementById('loginButton');
+  const userInfo = document.getElementById('userInfo');
+  const emailForm = document.getElementById('emailForm');
+  
+  if (loginButton) {
+    loginButton.style.display = 'none';
+  }
+  
+  if (userInfo) {
+    userInfo.style.display = 'block';
+    const userEmail = document.getElementById('userEmail');
+    if (userEmail) {
+      userEmail.textContent = user.email;
+    }
+  }
+  
+  if (emailForm) {
+    emailForm.style.display = 'block';
+  }
+}
 
 function addRecipient() {
   const list = document.getElementById('recipient-list');

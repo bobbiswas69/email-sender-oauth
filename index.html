@@ -56,39 +56,52 @@
       <div id="authActions"></div>
     </header>
 
-    <!-- YOUR NAME -->
-    <section class="translucent-box" id="userInfo">
-      <h2>Your Details</h2>
-      <label>Your Name:</label>
-      <input type="text" id="userNameInput" placeholder="e.g. John Smith" />
-    </section>
-
-    <!-- JOB INFO -->
-    <section class="translucent-box" id="job-info">
-      <h2>Job Information</h2>
-      <div class="form-row">
-        <label for="role">Role:</label>
-        <input type="text" id="role" placeholder="e.g. SWE" required>
-      </div>
-      <div class="form-row">
-        <label for="company">Company:</label>
-        <input type="text" id="company" placeholder="e.g. Google" required>
-      </div>
-      <div class="form-row">
-        <label for="joblink">Job Link:</label>
-        <input type="url" id="joblink" placeholder="https://..." required>
-      </div>
-    </section>
-
-    <!-- EMAIL SUBJECT & TEMPLATE -->
-    <section class="translucent-box" id="template-section">
-      <h2>Email Subject & Template</h2>
-      <div class="form-row">
-        <label for="subjectInput">Subject:</label>
-        <input type="text" id="subjectInput" placeholder="Regarding {Role} at {Company}" required>
-      </div>
+    <div class="auth-section">
+      <button id="loginButton" class="google-sign-in">
+        <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" alt="G">
+        Sign in with Google
+      </button>
       
-      <textarea id="emailTemplate" rows="12">
+      <div id="userInfo" style="display: none;">
+        <p>Logged in as: <span id="userEmail"></span></p>
+        <button onclick="logout()" class="logout-button">Logout</button>
+      </div>
+    </div>
+
+    <div id="emailForm" style="display: none;">
+      <!-- YOUR NAME -->
+      <section class="translucent-box" id="userInfo">
+        <h2>Your Details</h2>
+        <label>Your Name:</label>
+        <input type="text" id="userNameInput" placeholder="e.g. John Smith" />
+      </section>
+
+      <!-- JOB INFO -->
+      <section class="translucent-box" id="job-info">
+        <h2>Job Information</h2>
+        <div class="form-row">
+          <label for="role">Role:</label>
+          <input type="text" id="role" placeholder="e.g. SWE" required>
+        </div>
+        <div class="form-row">
+          <label for="company">Company:</label>
+          <input type="text" id="company" placeholder="e.g. Google" required>
+        </div>
+        <div class="form-row">
+          <label for="joblink">Job Link:</label>
+          <input type="url" id="joblink" placeholder="https://..." required>
+        </div>
+      </section>
+
+      <!-- EMAIL SUBJECT & TEMPLATE -->
+      <section class="translucent-box" id="template-section">
+        <h2>Email Subject & Template</h2>
+        <div class="form-row">
+          <label for="subjectInput">Subject:</label>
+          <input type="text" id="subjectInput" placeholder="Regarding {Role} at {Company}" required>
+        </div>
+        
+        <textarea id="emailTemplate" rows="12">
 Hello {Name},
 
 I know you're really busy and that you get a lot of emails. So this will only take sixty seconds to read.
@@ -104,49 +117,50 @@ I totally understand if you're too busy to respond. But even a one- or two-line 
 
 Best regards,
 {UserName}
-      </textarea>
-    </section>
+        </textarea>
+      </section>
 
-    <!-- RECIPIENTS -->
-    <section class="translucent-box">
-      <h2>Recipients</h2>
-      <div id="recipient-list">
-        <div class="recipient-block">
-          <input type="text" name="name" placeholder="Recipient Name" required>
-          <input type="email" name="email" placeholder="Recipient Email" required>
+      <!-- RECIPIENTS -->
+      <section class="translucent-box">
+        <h2>Recipients</h2>
+        <div id="recipient-list">
+          <div class="recipient-block">
+            <input type="text" name="name" placeholder="Recipient Name" required>
+            <input type="email" name="email" placeholder="Recipient Email" required>
+          </div>
         </div>
-      </div>
-      <button id="addRecipientBtn">+ Add Another Recipient</button>
-    </section>
+        <button id="addRecipientBtn">+ Add Another Recipient</button>
+      </section>
 
-    <!-- RESUME UPLOAD -->
-    <section class="translucent-box" id="resume-section">
-      <h2>Upload a Resume (PDF)</h2>
-      <p>Optional: attach a single PDF to all emails in this batch.</p>
-      <input type="file" id="resumeFileInput" accept="application/pdf">
-      <p class="note" id="uploadedResumeName"></p>
-    </section>
+      <!-- RESUME UPLOAD -->
+      <section class="translucent-box" id="resume-section">
+        <h2>Upload a Resume (PDF)</h2>
+        <p>Optional: attach a single PDF to all emails in this batch.</p>
+        <input type="file" id="resumeFileInput" accept="application/pdf">
+        <p class="note" id="uploadedResumeName"></p>
+      </section>
 
-    <!-- SEND BUTTON -->
-    <section id="send-section">
-      <button id="sendBtn">Send Emails</button>
-      <div id="status"></div>
-    </section>
+      <!-- SEND BUTTON -->
+      <section id="send-section">
+        <button id="sendBtn">Send Emails</button>
+        <div id="status"></div>
+      </section>
 
-    <!-- INSTRUCTIONS -->
-    <section class="translucent-box" id="instructions">
-      <h2>Quick Overview</h2>
-      <ul>
-        <li><strong>Sign in</strong> (with the "G" button) so we can send from your Gmail.</li>
-        <li>Fill out <strong>Your Name</strong>, <strong>Role</strong>, <strong>Company</strong>, etc.</li>
-        <li>Add multiple recipients if needed. You can remove any extra by clicking "x."</li>
-        <li>Optionally upload a PDF resume (only one). Re-upload to overwrite.</li>
-        <li>Hit "Send Emails" to deliver personalized messages. 
-            Each recipient sees a personal email from your Gmail.
-        </li>
-        <li>All free, no registration beyond Gmail sign-in.</li>
-      </ul>
-    </section>
+      <!-- INSTRUCTIONS -->
+      <section class="translucent-box" id="instructions">
+        <h2>Quick Overview</h2>
+        <ul>
+          <li><strong>Sign in</strong> (with the "G" button) so we can send from your Gmail.</li>
+          <li>Fill out <strong>Your Name</strong>, <strong>Role</strong>, <strong>Company</strong>, etc.</li>
+          <li>Add multiple recipients if needed. You can remove any extra by clicking "x."</li>
+          <li>Optionally upload a PDF resume (only one). Re-upload to overwrite.</li>
+          <li>Hit "Send Emails" to deliver personalized messages. 
+              Each recipient sees a personal email from your Gmail.
+          </li>
+          <li>All free, no registration beyond Gmail sign-in.</li>
+        </ul>
+      </section>
+    </div> <!-- emailForm -->
   </div> <!-- mainContent -->
 
   <!-- FOOTER -->

@@ -2,16 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const nodemailer = require('nodemailer');
-const rateLimit = require('express-rate-limit');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const helmet = require('helmet');
 const xssClean = require('xss-clean');
-const xss = require('xss');
 const hpp = require('hpp');
 const { body, validationResult } = require('express-validator');
 const { google } = require('googleapis');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 
@@ -95,35 +95,7 @@ app.use(
   })
 );
 
-// Initialize passport before routes
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Add logging middleware before routes
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Headers:', req.headers);
-  console.log('Session:', req.session);
-  console.log('User:', req.user);
-  console.log('Cookies:', req.cookies);
-  console.log('Session Store:', sessionStore);
-  next();
-});
-
-// PASSPORT CONFIG
-passport.serializeUser((user, done) => {
-  console.log('Serializing user:', user);
-  // Store the entire user object
-  done(null, user);
-});
-
-passport.deserializeUser((user, done) => {
-  console.log('Deserializing user:', user);
-  // Return the entire user object
-  done(null, user);
-});
-
-// Google OAuth
+// Google OAuth2 client setup
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -132,7 +104,7 @@ const oauth2Client = new google.auth.OAuth2(
     : 'http://localhost:3000/auth/google/callback'
 );
 
-// Add this function before the routes
+// Token refresh function
 async function refreshAccessToken(refreshToken) {
   try {
     oauth2Client.setCredentials({
@@ -147,72 +119,33 @@ async function refreshAccessToken(refreshToken) {
   }
 }
 
-// Update the sendEmail function
-async function sendEmail(req, res) {
-  try {
-    const { to, subject, text, html, hasAttachments } = req.body;
-    const user = req.session.user;
-
-    if (!user || !user.accessToken || !user.refreshToken) {
-      console.error('User not authenticated or missing tokens');
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    console.log('Attempting to send email to:', to);
-    console.log('Mail options:', {
-      from: user.email,
-      to,
-      subject,
-      hasAttachments
-    });
-
-    let accessToken = user.accessToken;
-    
-    // Try to refresh the token if it's expired
-    try {
-      accessToken = await refreshAccessToken(user.refreshToken);
-      // Update the session with the new access token
-      req.session.user.accessToken = accessToken;
-      await new Promise((resolve, reject) => {
-        req.session.save((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-    } catch (refreshError) {
-      console.error('Error refreshing token:', refreshError);
-      // If refresh fails, clear the session and require re-authentication
-      req.session.destroy();
-      return res.status(401).json({ 
-        error: 'Authentication expired. Please log in again.',
-        redirect: '/'
-      });
-    }
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        type: 'OAuth2',
-        user: user.email,
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        refreshToken: user.refreshToken,
-        accessToken: accessToken
-      }
-    });
-
-    // ... rest of the sendEmail function remains the same ...
-  } catch (error) {
-    console.error('Detailed error sending emails:', error);
-    res.status(500).json({ 
-      error: 'Failed to send email',
-      details: error.message,
-      stack: error.stack
-    });
+// Routes
+app.get('/api/current-user', (req, res) => {
+  console.log('Current user request received');
+  console.log('Session:', req.session);
+  console.log('User:', req.session.user);
+  console.log('Cookies:', req.cookies);
+  console.log('Session Store:', sessionStore);
+  
+  if (!req.session.user) {
+    return res.status(401).json({ error: 'Not authenticated' });
   }
-}
+  res.json(req.session.user);
+});
 
-// Update the Google OAuth callback route
+app.get('/auth/google', (req, res) => {
+  const authUrl = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/gmail.send'
+    ],
+    prompt: 'consent'
+  });
+  res.redirect(authUrl);
+});
+
 app.get('/auth/google/callback', async (req, res) => {
   try {
     const { code } = req.query;
@@ -255,57 +188,6 @@ app.get('/auth/google/callback', async (req, res) => {
       : 'http://localhost:5500/'
     );
   }
-});
-
-// ROUTES
-app.get('/auth/google', (req, res, next) => {
-  console.log('Starting Google OAuth flow');
-  passport.authenticate('google')(req, res, next);
-});
-
-// Add error handling for auth failures
-app.get('/auth/failure', (req, res) => {
-  console.error('Auth failure:', req.session.messages);
-  res.status(401).json({ 
-    error: 'Authentication failed',
-    message: req.session.messages?.pop() || 'Unknown error'
-  });
-});
-
-// FIX LOGOUT
-app.get('/logout', (req, res) => {
-  if (req.session) {
-    // First logout from passport
-    req.logout((err) => {
-      if (err) {
-        console.error('Error logging out:', err);
-      }
-      // Then destroy the session
-      req.session.destroy((err) => {
-        if (err) {
-          console.error('Error destroying session:', err);
-        }
-        res.clearCookie('sessionId');
-        res.clearCookie('connect.sid');
-        
-        // Set CORS headers
-        res.header('Access-Control-Allow-Credentials', 'true');
-        res.header('Access-Control-Allow-Origin', req.headers.origin);
-        
-        res.json({ success: true, message: 'Logged out successfully' });
-      });
-    });
-  } else {
-    res.json({ success: true, message: 'Already logged out' });
-  }
-});
-
-// Check current user
-app.get('/api/current-user', (req, res) => {
-  if (!req.user) {
-    return res.json({ loggedIn: false });
-  }
-  return res.json({ loggedIn: true, email: req.user.email });
 });
 
 // Input validation middleware
@@ -444,5 +326,5 @@ app.post('/send-emails',
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('Server running on port', PORT);
+  console.log(`Server is running on port ${PORT}`);
 });
